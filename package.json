@@ -1,0 +1,16 @@
+{
+  "name": "mindweb-server",
+  "version": "0.0.0",
+  "description": "Mindweb server to connect to mindwave device and send data to a port.",
+  "main": "server.js",
+  "dependencies": {
+    "ws": "~0.4.31"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "author": "Sunny (darkowlzz) <indiasuny000@gmail.com>",
+  "license": "MPL 2.0"
+}
