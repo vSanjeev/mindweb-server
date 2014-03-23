@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset='utf-8'>
+  <style>
+    #start {
+      visibility: visible;
+    }
+
+    #reset {
+      visibility: hidden;
+    }
+
+    .axis path,
+    .axis line {
+      fill: none;
+      stroke: black;
+      shape-rendering: crispEdges;
+    }
+
+    .axis text {
+      font-family: sans-serif;
+      font-size: 11px;
+    }
+
+  </style>
+  <script type="text/javascript" src="d3/d3.v3.js"></script>
+</head>
+
+<body>
+<h4>Mindweb Visualizer</h4>
+<p>Web Socket port: 
+  <input id="port" type="text" placeholder="54014" />
+  Duration:
+  <input id="time" type="text" placeholder="10" />
+  <button id="start">Start</button>
+  <button id="reset">Reset</button>
+  <p id='status'></p>
+</p>
+
+<script>
+  // dataset to store the eeg data
+  //var dataset = [];
+  var dataset = [{"eSense":{"attention":48,"meditation":94},"eegPower":{"delta":8600,"theta":6480,"lowAlpha":6903,"highAlpha":8865,"lowBeta":4306,"highBeta":4413,"lowGamma":1588,"highGamma":2340},"poorSignalLevel":0},{"eSense":{"attention":50,"meditation":96},"eegPower":{"delta":31369,"theta":84090,"lowAlpha":52282,"highAlpha":23907,"lowBeta":27943,"highBeta":17755,"lowGamma":9301,"highGamma":2586},"poorSignalLevel":0},{"eSense":{"attention":64,"meditation":100},"eegPower":{"delta":23516,"theta":8133,"lowAlpha":9300,"highAlpha":31921,"lowBeta":15400,"highBeta":20323,"lowGamma":18324,"highGamma":1485},"poorSignalLevel":0},{"eSense":{"attention":66,"meditation":83},"eegPower":{"delta":12469,"theta":65395,"lowAlpha":16300,"highAlpha":13204,"lowBeta":26208,"highBeta":14921,"lowGamma":16815,"highGamma":1699},"poorSignalLevel":0},{"eSense":{"attention":75,"meditation":77},"eegPower":{"delta":16315,"theta":20269,"lowAlpha":27549,"highAlpha":8686,"lowBeta":19982,"highBeta":21466,"lowGamma":10688,"highGamma":4675},"poorSignalLevel":0},{"eSense":{"attention":84,"meditation":69},"eegPower":{"delta":26790,"theta":20346,"lowAlpha":8030,"highAlpha":12306,"lowBeta":34034,"highBeta":10365,"lowGamma":7098,"highGamma":3912},"poorSignalLevel":0},{"eSense":{"attention":67,"meditation":66},"eegPower":{"delta":357366,"theta":105571,"lowAlpha":31580,"highAlpha":85259,"lowBeta":23833,"highBeta":22172,"lowGamma":6785,"highGamma":6155},"poorSignalLevel":0},{"eSense":{"attention":51,"meditation":64},"eegPower":{"delta":85792,"theta":81424,"lowAlpha":4537,"highAlpha":15375,"lowBeta":872,"highBeta":3947,"lowGamma":4301,"highGamma":2114},"poorSignalLevel":0},{"eSense":{"attention":47,"meditation":60},"eegPower":{"delta":54912,"theta":71353,"lowAlpha":25589,"highAlpha":21327,"lowBeta":47080,"highBeta":29254,"lowGamma":18841,"highGamma":6377},"poorSignalLevel":0},{"eSense":{"attention":57,"meditation":64},"eegPower":{"delta":65123,"theta":8785,"lowAlpha":4966,"highAlpha":25998,"lowBeta":26636,"highBeta":28934,"lowGamma":14705,"highGamma":6823},"poorSignalLevel":0}];
+
+  // time, duration of the session. Default is 10.
+  var time = 10;
+
+  var start = document.getElementById('start');
+  var reset = document.getElementById('reset');
+
+  // listen to Reset button click
+  reset.onclick = function() {
+    document.location.href = document.URL;
+  }
+
+  /**
+   * Listen to Start button click and do:
+   * > change the button's
+   * > get and set proper time & port number
+   * > start ws port listener
+   */
+  start.onclick = function() {
+    start.style.visibility = 'hidden';
+    reset.style.visibility = 'visible';
+    var port = document.getElementById('port');
+    var duration = document.getElementById('time');
+    if (duration.value) {
+      time = duration.value;
+    }
+    //listen(port.value);
+    draw();
+  }
+
+  /**
+   * Create a web socket client and start listening to the given port and 
+   * start a timer with the given time. Call svg draw() when data collection
+   * is done.
+   * @param {String} port
+   *    WS Port number to listen to.
+   */
+  function listen(port) {
+    var status = document.getElementById('status');
+    status.textContent = "Collecting data . . ."
+    console.log('port received: ' + port);
+    var wsport = port || 54014;
+    console.log('port selected: ' + wsport);
+    var ws = new WebSocket('ws://localhost:' + wsport);
+    console.log('ws client ready!');
+
+    // Disconnect the ws client
+    function disconnect() {
+      ws.close();
+      console.log('disconnected!');
+      console.log(JSON.stringify(dataset));
+      draw();
+      var status = document.getElementById('status');
+      status.textContent = "Mind in " + time + " seconds";
+    }
+
+    window.setTimeout(disconnect, time * 1000);
+
+    ws.onmessage = function(v) {
+      var newData = JSON.parse(v.data);
+      dataset.push(newData);
+      console.log('data list ' + dataset);
+    }
+  }
+
+  /**
+   * Draw svg using the collected data in the global var dataset.
+   */
+  function draw() {
+    console.log('drawing...');
+    var width = 1100,
+        height = 300,
+        padding = 50;
+
+    // x-axis : time
+    var xScale = d3.scale.linear()
+                          .domain([0, dataset.length])
+                          //.range([0, width - 100]);
+                          .range([padding, (width - 100) - padding]);
+
+    // radius of circle
+    var yScaleAttention = d3.scale.linear()
+                          //.domain([0, 100])
+                          .domain([0, d3.max(dataset, function(d) { 
+                            return d['eSense']['attention']; 
+                          })])
+                          .range([height - padding, padding]);
+
+    // Attention
+    var svg1 = d3.select('body')
+                 .append('svg')
+                 .attr('width', width)
+                 .attr('height', height);
+
+    console.log('svg ready');
+
+    var attentionCircles = svg1.selectAll('circle')
+                              .data(dataset)
+                              .enter()
+                              .append('circle');
+
+    attentionCircles.attr('cx', function(d, i) {
+              //return (i * 100) + 100;
+              return xScale(i) + xScale(1) - padding;
+           })
+           //.attr('cy', height/2)
+           .attr('cy', function(d) {
+              return yScaleAttention(d['eSense']['attention']);
+           })
+           .attr('r', 10);
+              //function(d) {
+              //return d['eSense']['attention'];
+              //return yScale(d['eSense']['attention']);
+           //});
+
+    // x-axis bar
+    svg1.append('g')
+        .attr('class', 'axis')
+        .attr('transform', 'translate(0,' + (height - padding) + ')')
+        .call(d3.svg.axis()
+                    .scale(xScale)
+                    .orient('bottom'));
+
+    svg1.append('g')
+        .attr('class', 'axis')
+        .attr('transform', 'translate(' + padding + ',' + 0 + ')')
+        .call(d3.svg.axis()
+                    .scale(yScaleAttention)
+                    .orient('left'));
+
+    svg1.append('text')
+        .attr('transform', 'translate(' + (padding + 50) + ',' + padding + ')')
+        .text('Attention');
+
+    d3.select('body')
+      .append('br');
+    d3.select('body')
+      .append('br');
+    d3.select('body')
+      .append('br');
+
+
+    // Meditation
+    var yScaleMeditation = d3.scale.linear()
+                          //.domain([0, 100])
+                          .domain([0, d3.max(dataset, function(d) { 
+                            return d['eSense']['meditation']; 
+                          })])
+                          .range([height - padding, padding]);
+
+
+    var svg2 = d3.select('body')
+                 .append('svg')
+                 .attr('width', width)
+                 .attr('height', height);
+
+    var meditationCircles = svg2.selectAll('circle')
+                               .data(dataset)
+                               .enter()
+                               .append('circle');
+
+    meditationCircles.attr('cx', function(d, i) {
+                        //return (i * 100) + 100;
+                        return xScale(i) + xScale(1) - padding;
+                     })
+                     .attr('cy', function(d) {
+                        return yScaleMeditation(d['eSense']['meditation']);
+                     })
+                     .attr('r', 10);
+
+    // x-axis bar
+    svg2.append('g')
+        .attr('class', 'axis')
+        .attr('transform', 'translate(0,' + (height - padding) + ')')
+        .call(d3.svg.axis()
+                    .scale(xScale)
+                    .orient('bottom'));
+
+    svg2.append('g')
+        .attr('class', 'axis')
+        .attr('transform', 'translate(' + padding + ',' + 0 + ')')
+        .call(d3.svg.axis()
+                    .scale(yScaleMeditation)
+                    .orient('left'));
+
+    svg2.append('text')
+        .attr('transform', 'translate(' + (padding + 50)  + ',' + padding + ')')
+        .text('Meditation');
+  }
+
+</script>
+</body>
+</html>
