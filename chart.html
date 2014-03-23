@@ -1,28 +1,206 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
 <head>
   <meta charset='utf-8'>
+  <style>
+    #start {
+      visibility: visible;
+    }
+
+    #reset {
+      visibility: hidden;
+    }
+
+    .axis path,
+    .axis line {
+      fill: none;
+      stroke: black;
+      shape-rendering: crispEdges;
+    }
+
+    .axis text {
+      font-family: sans-serif;
+      font-size: 11px;
+    }
+
+  </style>
+  <script type="text/javascript" src="d3/d3.v3.js"></script>
 </head>
+
 <body>
-<h4>Receiving data</h4>
+<h4>Mindweb Visualizer</h4>
+<p>Web Socket port: 
+  <input id="port" type="text" placeholder="54014" />
+  Duration:
+  <input id="time" type="text" placeholder="10" />
+  <button id="start">Start</button>
+  <button id="reset">Reset</button>
+  <p id='status'></p>
+</p>
+
 <script>
-  var ws = new WebSocket('ws://localhost:54014');
-  console.log('ws client ready!');
-  var data = [];
+  // dataset to store the eeg data
+  var dataset = [];
+  // time, duration of the session. Default is 10.
+  var time = 10;
 
-  function disconnect() {
-    ws.close();
-    console.log('disconnected!');
-    console.log(JSON.stringify(data));
+  var start = document.getElementById('start');
+  var reset = document.getElementById('reset');
+
+  // listen to Reset button click
+  reset.onclick = function() {
+    document.location.href = document.URL;
   }
 
-  window.setTimeout(disconnect, 10000);
-
-  ws.onmessage = function(v) {
-    var newData = JSON.parse(v.data);
-    data.push(newData);
-    console.log('data list ' + data);
+  /**
+   * Listen to Start button click and do:
+   * > change the button's
+   * > get and set proper time & port number
+   * > start ws port listener
+   */
+  start.onclick = function() {
+    start.style.visibility = 'hidden';
+    reset.style.visibility = 'visible';
+    var port = document.getElementById('port');
+    var duration = document.getElementById('time');
+    if (duration.value) {
+      time = duration.value;
+    }
+    listen(port.value);
   }
+
+  /**
+   * Create a web socket client and start listening to the given port and 
+   * start a timer with the given time. Call svg draw() when data collection
+   * is done.
+   * @param {String} port
+   *    WS Port number to listen to.
+   */
+  function listen(port) {
+    var status = document.getElementById('status');
+    status.textContent = "Collecting data . . ."
+    console.log('port received: ' + port);
+    var wsport = port || 54014;
+    console.log('port selected: ' + wsport);
+    var ws = new WebSocket('ws://localhost:' + wsport);
+    console.log('ws client ready!');
+
+    // Disconnect the ws client
+    function disconnect() {
+      ws.close();
+      console.log('disconnected!');
+      console.log(JSON.stringify(dataset));
+      draw();
+      var status = document.getElementById('status');
+      status.textContent = "Mind in " + time + " seconds";
+    }
+
+    window.setTimeout(disconnect, time * 1000);
+
+    ws.onmessage = function(v) {
+      var newData = JSON.parse(v.data);
+      dataset.push(newData);
+      console.log('data list ' + dataset);
+    }
+  }
+
+  /**
+   * Draw svg using the collected data in the global var dataset.
+   */
+  function draw() {
+    console.log('drawing...');
+    var width = 1100,
+        height = 200,
+        padding = 20;
+
+    // x-axis : time
+    var xScale = d3.scale.linear()
+                          .domain([0, dataset.length])
+                          //.range([0, width - 100]);
+                          .range([padding, (width - 100) - padding]);
+
+    // radius of circle
+    var yScale = d3.scale.linear()
+                          .domain([0, 100])
+                          .range([0, 30]);
+
+    // Attention
+    var svg1 = d3.select('body')
+                 .append('svg')
+                 .attr('width', width)
+                 .attr('height', height);
+
+    console.log('svg ready');
+
+    var attentionCircles = svg1.selectAll('circle')
+                              .data(dataset)
+                              .enter()
+                              .append('circle');
+
+    attentionCircles.attr('cx', function(d, i) {
+              //return (i * 100) + 100;
+              return xScale(i) + xScale(1) - padding;
+           })
+           .attr('cy', height/2)
+           .attr('r', function(d) {
+              //return d['eSense']['attention'];
+              return yScale(d['eSense']['attention']);
+           });
+
+    // x-axis bar
+    svg1.append('g')
+        .attr('class', 'axis')
+        .attr('transform', 'translate(0,' + (height - padding) + ')')
+        .call(d3.svg.axis()
+                    .scale(xScale)
+                    .orient('bottom'));
+
+    svg1.append('text')
+        .attr('transform', 'translate(' + padding + ',' + padding + ')')
+        .text('Attention');
+
+    d3.select('body')
+      .append('br');
+    d3.select('body')
+      .append('br');
+    d3.select('body')
+      .append('br');
+
+
+    // Meditation
+    var svg2 = d3.select('body')
+                 .append('svg')
+                 .attr('width', width)
+                 .attr('height', height);
+
+    var meditationCircles = svg2.selectAll('circle')
+                               .data(dataset)
+                               .enter()
+                               .append('circle');
+
+    meditationCircles.attr('cx', function(d, i) {
+                        //return (i * 100) + 100;
+                        return xScale(i) + xScale(1) - padding;
+                     })
+                     .attr('cy', height/2)
+                     .attr('r', function(d) {
+                        //return d['eSense']['meditation'];
+                        return yScale(d['eSense']['meditation']);
+                     });
+
+    // x-axis bar
+    svg2.append('g')
+        .attr('class', 'axis')
+        .attr('transform', 'translate(0,' + (height - padding) + ')')
+        .call(d3.svg.axis()
+                    .scale(xScale)
+                    .orient('bottom'));
+
+    svg2.append('text')
+        .attr('transform', 'translate(' + padding + ',' + padding + ')')
+        .text('Meditation');
+  }
+
 </script>
 </body>
 </html>
