@@ -15,6 +15,10 @@
       visibility: hidden;
     }
 
+    #rawData {
+      visibility: visible;
+    }
+
     .axis path,
     .axis line {
       fill: none;
@@ -38,7 +42,12 @@
   Duration:
   <input id='time' type='text' placeholder='10' />
   <button id='start'>Start</button>
-  <button id='reset'>Reset</button>
+  <button id='reset'>Reset</button><br><br>
+  <div id='rawData'>
+    <p>No Mindwave device? Use this sample data.</p>
+    <textarea id='sampleData' cols='170' rows='21'>[{"eSense":{"attention":48,"meditation":94},"eegPower":{"delta":8600,"theta":6480,"lowAlpha":6903,"highAlpha":8865,"lowBeta":4306,"highBeta":4413,"lowGamma":1588,"highGamma":2340},"poorSignalLevel":0},{"eSense":{"attention":50,"meditation":96},"eegPower":{"delta":31369,"theta":84090,"lowAlpha":52282,"highAlpha":23907,"lowBeta":27943,"highBeta":17755,"lowGamma":9301,"highGamma":2586},"poorSignalLevel":0},{"eSense":{"attention":64,"meditation":100},"eegPower":{"delta":23516,"theta":8133,"lowAlpha":9300,"highAlpha":31921,"lowBeta":15400,"highBeta":20323,"lowGamma":18324,"highGamma":1485},"poorSignalLevel":0},{"eSense":{"attention":66,"meditation":83},"eegPower":{"delta":12469,"theta":65395,"lowAlpha":16300,"highAlpha":13204,"lowBeta":26208,"highBeta":14921,"lowGamma":16815,"highGamma":1699},"poorSignalLevel":0},{"eSense":{"attention":75,"meditation":77},"eegPower":{"delta":16315,"theta":20269,"lowAlpha":27549,"highAlpha":8686,"lowBeta":19982,"highBeta":21466,"lowGamma":10688,"highGamma":4675},"poorSignalLevel":0},{"eSense":{"attention":84,"meditation":69},"eegPower":{"delta":26790,"theta":20346,"lowAlpha":8030,"highAlpha":12306,"lowBeta":34034,"highBeta":10365,"lowGamma":7098,"highGamma":3912},"poorSignalLevel":0},{"eSense":{"attention":67,"meditation":66},"eegPower":{"delta":357366,"theta":105571,"lowAlpha":31580,"highAlpha":85259,"lowBeta":23833,"highBeta":22172,"lowGamma":6785,"highGamma":6155},"poorSignalLevel":0},{"eSense":{"attention":51,"meditation":64},"eegPower":{"delta":85792,"theta":81424,"lowAlpha":4537,"highAlpha":15375,"lowBeta":872,"highBeta":3947,"lowGamma":4301,"highGamma":2114},"poorSignalLevel":0},{"eSense":{"attention":47,"meditation":60},"eegPower":{"delta":54912,"theta":71353,"lowAlpha":25589,"highAlpha":21327,"lowBeta":47080,"highBeta":29254,"lowGamma":18841,"highGamma":6377},"poorSignalLevel":0},{"eSense":{"attention":57,"meditation":64},"eegPower":{"delta":65123,"theta":8785,"lowAlpha":4966,"highAlpha":25998,"lowBeta":26636,"highBeta":28934,"lowGamma":14705,"highGamma":6823},"poorSignalLevel":0}]</textarea><br>
+    <button id='useRaw'>Use This</button>
+  </div>
   <p id='status'></p>
   <div id='genGraph'>
     <select id='graphs' size='10' multiple>
@@ -67,6 +76,7 @@
   var start = document.getElementById('start');
   var reset = document.getElementById('reset');
   var generate = document.getElementById('generate');
+  var useRaw = document.getElementById('useRaw');
 
   // listen to Reset button click
   reset.onclick = function() {
@@ -80,6 +90,11 @@
    * > start ws port listener
    */
   start.onclick = function() {
+    var rawSection = document.getElementById('rawData');
+    //rawSection.style.visibility = 'hidden';
+    while (rawSection.firstChild) {
+      rawSection.removeChild(rawSection.firstChild);
+    }
     start.style.visibility = 'hidden';
     reset.style.visibility = 'visible';
     var port = document.getElementById('port');
@@ -88,6 +103,19 @@
       time = duration.value;
     }
     listen(port.value);
+  }
+
+  /**
+   * Collect the given data and push to dataset.
+   */
+  useRaw.onclick = function() {
+    start.style.visibility = 'hidden';
+    reset.style.visibility = 'visible';
+    var textArea = document.getElementById('sampleData');
+    dataset = JSON.parse(textArea.value);
+    console.log(JSON.stringify(dataset));
+    var graphs = document.getElementById('genGraph');
+    graphs.style.visibility = 'visible';
   }
 
   /**
