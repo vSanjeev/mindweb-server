@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset='utf-8'>
+  <style>
+    #start {
+      visibility: visible;
+    }
+
+    #reset {
+      visibility: hidden;
+    }
+
+    #genGraph {
+      visibility: hidden;
+    }
+
+    .axis path,
+    .axis line {
+      fill: none;
+      stroke: black;
+      shape-rendering: crispEdges;
+    }
+
+    .axis text {
+      font-family: sans-serif;
+      font-size: 11px;
+    }
+
+  </style>
+  <script type="text/javascript" src="d3/d3.v3.js"></script>
+</head>
+
+<body>
+<h4>Mindweb Visualizer</h4>
+<p>Web Socket port: 
+  <input id='port' type='text' placeholder='54014' />
+  Duration:
+  <input id='time' type='text' placeholder='10' />
+  <button id='start'>Start</button>
+  <button id='reset'>Reset</button>
+  <p id='status'></p>
+  <div id='genGraph'>
+    <select id='graphs' size='10' multiple>
+      <option value='meditation'>Meditation</option>
+      <option value='attention'>Attention</option>
+      <option value='delta'>Delta</option>
+      <option value='theta'>Theta</option>
+      <option value='lowAlpha'>Low Alpha</option>
+      <option value='highAlpha'>High Alpha</option>
+      <option value='lowBeta'>Low Beta</option>
+      <option value='highBeta'>High Beta</option>
+      <option value='lowGamma'>Low Gamma</option>
+      <option value='highGamma'>High Gamma</option>
+    </select>
+    <button id='generate'>Generate</button>
+  </div>
+</p>
+
+<script>
+  // dataset to store the eeg data
+  var dataset = [];
+
+  // time, duration of the session. Default is 10.
+  var time = 10;
+
+  var start = document.getElementById('start');
+  var reset = document.getElementById('reset');
+  var generate = document.getElementById('generate');
+
+  // listen to Reset button click
+  reset.onclick = function() {
+    document.location.href = document.URL;
+  }
+
+  /**
+   * Listen to Start button click and do:
+   * > change the button's
+   * > get and set proper time & port number
+   * > start ws port listener
+   */
+  start.onclick = function() {
+    start.style.visibility = 'hidden';
+    reset.style.visibility = 'visible';
+    var port = document.getElementById('port');
+    var duration = document.getElementById('time');
+    if (duration.value) {
+      time = duration.value;
+    }
+    listen(port.value);
+  }
+
+  /**
+   * Listen to Generate button click and generate graphs.
+   */
+  generate.onclick = function() {
+    var graphs = document.getElementById('graphs');
+    var graphList = graphs.selectedOptions;
+    for (var i = 0; i < graphList.length; i++) {
+      draw(graphList[i].value);
+    }
+  }
+
+  /**
+   * Create a web socket client and start listening to the given port and 
+   * start a timer with the given time. Call svg draw() when data collection
+   * is done.
+   * @param {String} port
+   *    WS Port number to listen to.
+   */
+  function listen(port) {
+    var status = document.getElementById('status');
+    status.textContent = "Collecting data . . ."
+    console.log('port received: ' + port);
+    var wsport = port || 54014;
+    console.log('port selected: ' + wsport);
+    var ws = new WebSocket('ws://localhost:' + wsport);
+    console.log('ws client ready!');
+
+    // Disconnect the ws client
+    function disconnect() {
+      ws.close();
+      console.log('disconnected!');
+      console.log(JSON.stringify(dataset));
+      var status = document.getElementById('status');
+      status.textContent = "" + time + " seconds of data collected.";
+      var graphs = document.getElementById('genGraph');
+      graphs.style.visibility = 'visible';
+    }
+
+    window.setTimeout(disconnect, time * 1000);
+
+    ws.onmessage = function(v) {
+      var newData = JSON.parse(v.data);
+      dataset.push(newData);
+      console.log('data list ' + dataset);
+    }
+  }
+
+  /**
+   * Draw svg using the collected data in the global var dataset.
+   * @param {String} mindSignal
+   *    Name of mind signal. Could be delta, theta, low alpha, high alpha,
+   *    low beta, high beta, low gamma, high gamma.
+   */
+  function draw(mindSignal) {
+    console.log('signal: ' + mindSignal);
+    console.log('drawing...');
+
+    var signalType = null;
+    if (mindSignal === 'attention' || mindSignal === 'meditation') {
+      signalType = 'eSense';
+    }
+    else {
+      signalType = 'eegPower';
+    }
+
+    var width = 1100,
+        height = 300,
+        padding = 50;
+
+    // x-axis : time
+    var xScale = d3.scale.linear()
+                          .domain([0, dataset.length])
+                          //.range([0, width - 100]);
+                          .range([padding, (width - 100) - padding]);
+
+    // y-axis : intensity 
+    var yScale = d3.scale.linear()
+                          //.domain([0, 100])
+                          .domain([0, d3.max(dataset, function(d) { 
+                            return d[signalType][mindSignal]; 
+                          })])
+                          .range([height - padding, padding]);
+
+    // Attention
+    var svg = d3.select('body')
+                 .append('svg')
+                 .attr('width', width)
+                 .attr('height', height)
+                 .attr('id', mindSignal);
+
+    console.log('svg ready');
+
+    var attentionCircles = svg.selectAll('circle')
+                              .data(dataset)
+                              .enter()
+                              .append('circle');
+
+    attentionCircles.attr('cx', function(d, i) {
+              return xScale(i) + xScale(1) - padding;
+           })
+           .attr('cy', function(d) {
+              return yScale(d[signalType][mindSignal]);
+           })
+           .attr('r', 3);
+
+    // x-axis bar
+    svg.append('g')
+        .attr('class', 'axis')
+        .attr('transform', 'translate(0,' + (height - padding) + ')')
+        .call(d3.svg.axis()
+                    .scale(xScale)
+                    .orient('bottom'));
+
+    // y-axis bar
+    svg.append('g')
+        .attr('class', 'axis')
+        .attr('transform', 'translate(' + padding + ',' + 0 + ')')
+        .call(d3.svg.axis()
+                    .scale(yScale)
+                    .orient('left'));
+
+    // Graph name
+    svg.append('text')
+        .attr('transform', 'translate(' + (padding + 50) + ',' + (padding - 20) + ')')
+        .text(mindSignal);
+
+    // some space at bottom
+    d3.select('body')
+      .append('br');
+    d3.select('body')
+      .append('br');
+    d3.select('body')
+      .append('br');
+  }
+
+</script>
+</body>
+</html>
