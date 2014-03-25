@@ -19,6 +19,10 @@
       visibility: visible;
     }
 
+    #exportDiv {
+      visibility: hidden;
+    }
+
     .axis path,
     .axis line {
       fill: none;
@@ -32,7 +36,8 @@
     }
 
   </style>
-  <script type="text/javascript" src="d3/d3.v3.js"></script>
+  <script type='text/javascript' src='d3/d3.v3.js'></script>
+  <script type='text/javascript' src='FileSaver.js/FileSaver.js'></script>
 </head>
 
 <body>
@@ -50,6 +55,7 @@
   </div>
   <p id='status'></p>
   <div id='genGraph'>
+    <p>Select the wave(s):</p>
     <select id='graphs' size='10' multiple>
       <option value='meditation'>Meditation</option>
       <option value='attention'>Attention</option>
@@ -64,7 +70,10 @@
     </select>
     <button id='generate'>Generate</button>
   </div>
-</p>
+  <br>
+  <div id="exportDiv">
+  <p>Export all the below SVGs in a single file? <button id='exportAll'>Export All</button></p>
+  </div>
 
 <script>
   // dataset to store the eeg data
@@ -125,8 +134,24 @@
     var graphs = document.getElementById('graphs');
     var graphList = graphs.selectedOptions;
     for (var i = 0; i < graphList.length; i++) {
+      document.body.appendChild(document.createElement('br'));
       draw(graphList[i].value);
+      document.body.appendChild(document.createElement('br'));
+      var button = document.createElement('button');
+      button.textContent = 'export svg';
+      button.addEventListener('click', function(graphName) {
+        return function() {
+          exportSVG(graphName);
+        };
+      }(graphList[i].value));
+      document.body.appendChild(button);
+      document.body.appendChild(document.createElement('hr'));
     }
+
+    var exportDiv = document.getElementById('exportDiv');
+    exportDiv.style.visibility = 'visible';
+    var exportAll = document.getElementById('exportAll');
+    exportAll.addEventListener('click', exportAllSVG);
   }
 
   /**
@@ -201,14 +226,11 @@
                           })])
                           .range([height - padding, padding]);
 
-    // Attention
     var svg = d3.select('body')
                  .append('svg')
                  .attr('width', width)
                  .attr('height', height)
                  .attr('id', mindSignal);
-
-    console.log('svg ready');
 
     var attentionCircles = svg.selectAll('circle')
                               .data(dataset)
@@ -243,16 +265,41 @@
     svg.append('text')
         .attr('transform', 'translate(' + (padding + 50) + ',' + (padding - 20) + ')')
         .text(mindSignal);
-
-    // some space at bottom
-    d3.select('body')
-      .append('br');
-    d3.select('body')
-      .append('br');
-    d3.select('body')
-      .append('br');
   }
 
+  /**
+   * Export a given SVG to a downloadable file.
+   * @param {String} graphName
+   *    Name of the graph to be exported.
+   */
+  function exportSVG(graphName) {
+    console.log('exporting ' + graphName);
+    var svg = document.getElementById(graphName);
+    var rawSVG = svgStyle + '<svg width="1100" height="300">' + svg.innerHTML + '</svg>';
+    var blob = new Blob([rawSVG], {type: 'text/plain;charset=utf-8'});
+    saveAs(blob, graphName + '.html');
+  }
+
+  /**
+   * Export all the generated SVGs to a single downloadable file.
+   */
+  function exportAllSVG() {
+    console.log('exporting all');
+    var svgs = document.getElementsByTagName('svg');
+    var rawSVG = svgStyle; 
+    for (var i = 0; i < svgs.length; i++) {
+      rawSVG += '<svg width="1100" height="300">' + svgs[i].innerHTML +
+                '</svg><br><br>';
+    }
+    var blob = new Blob([rawSVG], {type: 'text/plain;charset=utf-8'});
+    saveAs(blob, 'allGraphs.html');
+  }
+
+  // Style to be embeded in exported svg files
+  var svgStyle = '<style>' + 
+                 '.axis path,.axis line {fill: none;stroke: black;shape-rendering: crispEdges;}' +
+                 '.axis text {font-family: sans-serif;font-size: 11px;}' +
+                 '</style>';
 </script>
 </body>
 </html>
