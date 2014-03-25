@@ -11,6 +11,10 @@
       visibility: hidden;
     }
 
+    #genGraph {
+      visibility: hidden;
+    }
+
     .axis path,
     .axis line {
       fill: none;
@@ -30,24 +34,39 @@
 <body>
 <h4>Mindweb Visualizer</h4>
 <p>Web Socket port: 
-  <input id="port" type="text" placeholder="54014" />
+  <input id='port' type='text' placeholder='54014' />
   Duration:
-  <input id="time" type="text" placeholder="10" />
-  <button id="start">Start</button>
-  <button id="reset">Reset</button>
+  <input id='time' type='text' placeholder='10' />
+  <button id='start'>Start</button>
+  <button id='reset'>Reset</button>
   <p id='status'></p>
+  <div id='genGraph'>
+    <select id='graphs' size='10' multiple>
+      <option value='meditation'>Meditation</option>
+      <option value='attention'>Attention</option>
+      <option value='delta'>Delta</option>
+      <option value='theta'>Theta</option>
+      <option value='lowAlpha'>Low Alpha</option>
+      <option value='highAlpha'>High Alpha</option>
+      <option value='lowBeta'>Low Beta</option>
+      <option value='highBeta'>High Beta</option>
+      <option value='lowGamma'>Low Gamma</option>
+      <option value='highGamma'>High Gamma</option>
+    </select>
+    <button id='generate'>Generate</button>
+  </div>
 </p>
 
 <script>
   // dataset to store the eeg data
-  //var dataset = [];
-  var dataset = [{"eSense":{"attention":48,"meditation":94},"eegPower":{"delta":8600,"theta":6480,"lowAlpha":6903,"highAlpha":8865,"lowBeta":4306,"highBeta":4413,"lowGamma":1588,"highGamma":2340},"poorSignalLevel":0},{"eSense":{"attention":50,"meditation":96},"eegPower":{"delta":31369,"theta":84090,"lowAlpha":52282,"highAlpha":23907,"lowBeta":27943,"highBeta":17755,"lowGamma":9301,"highGamma":2586},"poorSignalLevel":0},{"eSense":{"attention":64,"meditation":100},"eegPower":{"delta":23516,"theta":8133,"lowAlpha":9300,"highAlpha":31921,"lowBeta":15400,"highBeta":20323,"lowGamma":18324,"highGamma":1485},"poorSignalLevel":0},{"eSense":{"attention":66,"meditation":83},"eegPower":{"delta":12469,"theta":65395,"lowAlpha":16300,"highAlpha":13204,"lowBeta":26208,"highBeta":14921,"lowGamma":16815,"highGamma":1699},"poorSignalLevel":0},{"eSense":{"attention":75,"meditation":77},"eegPower":{"delta":16315,"theta":20269,"lowAlpha":27549,"highAlpha":8686,"lowBeta":19982,"highBeta":21466,"lowGamma":10688,"highGamma":4675},"poorSignalLevel":0},{"eSense":{"attention":84,"meditation":69},"eegPower":{"delta":26790,"theta":20346,"lowAlpha":8030,"highAlpha":12306,"lowBeta":34034,"highBeta":10365,"lowGamma":7098,"highGamma":3912},"poorSignalLevel":0},{"eSense":{"attention":67,"meditation":66},"eegPower":{"delta":357366,"theta":105571,"lowAlpha":31580,"highAlpha":85259,"lowBeta":23833,"highBeta":22172,"lowGamma":6785,"highGamma":6155},"poorSignalLevel":0},{"eSense":{"attention":51,"meditation":64},"eegPower":{"delta":85792,"theta":81424,"lowAlpha":4537,"highAlpha":15375,"lowBeta":872,"highBeta":3947,"lowGamma":4301,"highGamma":2114},"poorSignalLevel":0},{"eSense":{"attention":47,"meditation":60},"eegPower":{"delta":54912,"theta":71353,"lowAlpha":25589,"highAlpha":21327,"lowBeta":47080,"highBeta":29254,"lowGamma":18841,"highGamma":6377},"poorSignalLevel":0},{"eSense":{"attention":57,"meditation":64},"eegPower":{"delta":65123,"theta":8785,"lowAlpha":4966,"highAlpha":25998,"lowBeta":26636,"highBeta":28934,"lowGamma":14705,"highGamma":6823},"poorSignalLevel":0}];
+  var dataset = [];
 
   // time, duration of the session. Default is 10.
   var time = 10;
 
   var start = document.getElementById('start');
   var reset = document.getElementById('reset');
+  var generate = document.getElementById('generate');
 
   // listen to Reset button click
   reset.onclick = function() {
@@ -68,8 +87,18 @@
     if (duration.value) {
       time = duration.value;
     }
-    //listen(port.value);
-    draw();
+    listen(port.value);
+  }
+
+  /**
+   * Listen to Generate button click and generate graphs.
+   */
+  generate.onclick = function() {
+    var graphs = document.getElementById('graphs');
+    var graphList = graphs.selectedOptions;
+    for (var i = 0; i < graphList.length; i++) {
+      draw(graphList[i].value);
+    }
   }
 
   /**
@@ -93,9 +122,10 @@
       ws.close();
       console.log('disconnected!');
       console.log(JSON.stringify(dataset));
-      draw();
       var status = document.getElementById('status');
-      status.textContent = "Mind in " + time + " seconds";
+      status.textContent = "" + time + " seconds of data collected.";
+      var graphs = document.getElementById('genGraph');
+      graphs.style.visibility = 'visible';
     }
 
     window.setTimeout(disconnect, time * 1000);
@@ -109,9 +139,22 @@
 
   /**
    * Draw svg using the collected data in the global var dataset.
+   * @param {String} mindSignal
+   *    Name of mind signal. Could be delta, theta, low alpha, high alpha,
+   *    low beta, high beta, low gamma, high gamma.
    */
-  function draw() {
+  function draw(mindSignal) {
+    console.log('signal: ' + mindSignal);
     console.log('drawing...');
+
+    var signalType = null;
+    if (mindSignal === 'attention' || mindSignal === 'meditation') {
+      signalType = 'eSense';
+    }
+    else {
+      signalType = 'eegPower';
+    }
+
     var width = 1100,
         height = 300,
         padding = 50;
@@ -122,114 +165,64 @@
                           //.range([0, width - 100]);
                           .range([padding, (width - 100) - padding]);
 
-    // radius of circle
-    var yScaleAttention = d3.scale.linear()
+    // y-axis : intensity 
+    var yScale = d3.scale.linear()
                           //.domain([0, 100])
                           .domain([0, d3.max(dataset, function(d) { 
-                            return d['eSense']['attention']; 
+                            return d[signalType][mindSignal]; 
                           })])
                           .range([height - padding, padding]);
 
     // Attention
-    var svg1 = d3.select('body')
+    var svg = d3.select('body')
                  .append('svg')
                  .attr('width', width)
-                 .attr('height', height);
+                 .attr('height', height)
+                 .attr('id', mindSignal);
 
     console.log('svg ready');
 
-    var attentionCircles = svg1.selectAll('circle')
+    var attentionCircles = svg.selectAll('circle')
                               .data(dataset)
                               .enter()
                               .append('circle');
 
     attentionCircles.attr('cx', function(d, i) {
-              //return (i * 100) + 100;
               return xScale(i) + xScale(1) - padding;
            })
-           //.attr('cy', height/2)
            .attr('cy', function(d) {
-              return yScaleAttention(d['eSense']['attention']);
+              return yScale(d[signalType][mindSignal]);
            })
-           .attr('r', 10);
-              //function(d) {
-              //return d['eSense']['attention'];
-              //return yScale(d['eSense']['attention']);
-           //});
+           .attr('r', 3);
 
     // x-axis bar
-    svg1.append('g')
+    svg.append('g')
         .attr('class', 'axis')
         .attr('transform', 'translate(0,' + (height - padding) + ')')
         .call(d3.svg.axis()
                     .scale(xScale)
                     .orient('bottom'));
 
-    svg1.append('g')
+    // y-axis bar
+    svg.append('g')
         .attr('class', 'axis')
         .attr('transform', 'translate(' + padding + ',' + 0 + ')')
         .call(d3.svg.axis()
-                    .scale(yScaleAttention)
+                    .scale(yScale)
                     .orient('left'));
 
-    svg1.append('text')
-        .attr('transform', 'translate(' + (padding + 50) + ',' + padding + ')')
-        .text('Attention');
+    // Graph name
+    svg.append('text')
+        .attr('transform', 'translate(' + (padding + 50) + ',' + (padding - 20) + ')')
+        .text(mindSignal);
 
+    // some space at bottom
     d3.select('body')
       .append('br');
     d3.select('body')
       .append('br');
     d3.select('body')
       .append('br');
-
-
-    // Meditation
-    var yScaleMeditation = d3.scale.linear()
-                          //.domain([0, 100])
-                          .domain([0, d3.max(dataset, function(d) { 
-                            return d['eSense']['meditation']; 
-                          })])
-                          .range([height - padding, padding]);
-
-
-    var svg2 = d3.select('body')
-                 .append('svg')
-                 .attr('width', width)
-                 .attr('height', height);
-
-    var meditationCircles = svg2.selectAll('circle')
-                               .data(dataset)
-                               .enter()
-                               .append('circle');
-
-    meditationCircles.attr('cx', function(d, i) {
-                        //return (i * 100) + 100;
-                        return xScale(i) + xScale(1) - padding;
-                     })
-                     .attr('cy', function(d) {
-                        return yScaleMeditation(d['eSense']['meditation']);
-                     })
-                     .attr('r', 10);
-
-    // x-axis bar
-    svg2.append('g')
-        .attr('class', 'axis')
-        .attr('transform', 'translate(0,' + (height - padding) + ')')
-        .call(d3.svg.axis()
-                    .scale(xScale)
-                    .orient('bottom'));
-
-    svg2.append('g')
-        .attr('class', 'axis')
-        .attr('transform', 'translate(' + padding + ',' + 0 + ')')
-        .call(d3.svg.axis()
-                    .scale(yScaleMeditation)
-                    .orient('left'));
-
-    svg2.append('text')
-        .attr('transform', 'translate(' + (padding + 50)  + ',' + padding + ')')
-        .text('Meditation');
   }
 
 </script>
